@@ -1,12 +1,15 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const bodyParser = require("body-parser"); // Import bodyParser
+const cors = require("cors");
+
 
 const app = express();
 const port = 3000;
 
 const User = require("./model/company_data");
 
+app.use(cors());
 app.use(express.urlencoded({ extended: true }));
 app.use(bodyParser.json()); // Add the body parser middleware
 
@@ -24,7 +27,7 @@ app.use(express.static("templates"));
 app.use(express.static("src"));
 
 app.get("/", (req, res) => {
-  res.sendFile(__dirname + "/templates/admin.html");
+  res.sendFile(__dirname + "/templates/index.html");
 });
 
 app.get("/client", async (req, res) => {
@@ -189,6 +192,108 @@ app.get("/candidate_details", async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).send("Internal Server Error");
+  }
+});
+
+//recruiter routes
+
+const RecruiterCollection = require("./model/recruiter");
+const candidateCollection = require("./model/candidate");
+
+
+
+app.post('/add-candidate', async (req, res) => {
+
+  const monthNames = ["January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+];
+
+  const data = {
+      name: req.body.name,
+      phone: req.body.phone,
+      location: req.body.location,
+      jobInterest:req.body.jobInterest,
+      status:req.body.status,
+      joinedAt:req.body.joinedAt,
+      isActive:req.body.isActive,
+      month:monthNames[new Date(req.body.joinedAt).getMonth()]
+  };
+
+
+  try {
+          const response = await candidateCollection.create(data);
+          const recruiterId = req.body.recruiterId;
+          console.log(response);
+          const recruiter = await RecruiterCollection.findOne({_id:recruiterId});
+          recruiter.recruitedCandidates.push(response._id);
+          await recruiter.save();
+          res.status(201).json({
+              res: response
+          });
+  } catch (error) {
+      console.error(error);
+      res.send("Something went wrong");
+  }
+});
+
+app.get('/recruiter-candidates/:recruiterId', async (req, res) => {
+  const recruiterId = req.params.recruiterId;
+
+  try {
+      const recruiter = await RecruiterCollection.findById(recruiterId);
+      if (!recruiter) {
+          return res.status(404).json({ error: "Recruiter not found" });
+      }
+      await recruiter.populate('recruitedCandidates');
+      const candidates = recruiter.recruitedCandidates;
+      res.status(200).json({
+          recruiterId: recruiterId,
+          candidates: candidates
+      });
+  } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: "Something went wrong" });
+  }
+});
+
+
+app.post('/signup', async (req, res) => {
+  const data = {
+      name: req.body.name,
+      email: req.body.email,
+      password: req.body.password
+  };
+
+  try {
+      const checking = await RecruiterCollection.findOne({ email: req.body.email });
+
+      if (checking && checking.email === req.body.email && checking.password === req.body.password) {
+          res.send("User details already exist");
+      } else {
+          const response = await RecruiterCollection.create(data);
+          console.log(response);
+          res.status(201).json({
+              res: response
+          });
+      }
+  } catch (error) {
+      console.error(error);
+      res.send("Something went wrong");
+  }
+});
+
+app.post('/login', async (req, res) => {
+  try {
+      const check = await RecruiterCollection.findOne({ email: req.body.email });
+
+      if (check && check.password === req.body.password) {
+          res.status(201).json({res:check});
+      } else {
+          res.send("Incorrect password or user does not exist");
+      }
+  } catch (error) {
+      console.error(error);
+      res.send("Something went wrong");
   }
 });
 

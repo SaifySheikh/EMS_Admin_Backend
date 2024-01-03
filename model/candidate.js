@@ -27,6 +27,10 @@ const candidateSchema = new mongoose.Schema({
         type: Date,
         required: true
     },
+    month:{
+        type:String,
+        required:true
+    },
     isActive: {
         type: Boolean,
         required: true
